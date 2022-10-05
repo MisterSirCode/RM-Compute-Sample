@@ -5,7 +5,8 @@ using UnityEngine;
 public enum Type
 {
     Rectangle,
-    Circle
+    Circle,
+    Torus,
 }
 
 public enum Operation

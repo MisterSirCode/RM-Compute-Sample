@@ -41,6 +41,11 @@ float sdfBox(float2 cam, float2 pos, float2 scale) {
     return (g > 0.0) ? l : g;
 }
 
+float sdfTorus(float2 cam, float2 pos, float2 scale) {
+    float2 q = float2(length(cam - pos) - t.x, p.y);
+    return length(q) - t.y;
+}
+
 float4 Combine(float object1, float object2, float3 color1, float3 color2, int operation) {
     float distance = object1;
     float3 color = color1;
@@ -62,6 +67,8 @@ float GetShapeDistance(Object object, float2 cam) {
         return sdfBox(cam, object.position, object.scale);
     else if (object.type == 1)
         return sdfCircle(cam, object.position, object.scale.x);
+    else if (object.type == 2)
+        return sdfTorus(cam, object.position, object.scale);
     return max_range;
 }
 
