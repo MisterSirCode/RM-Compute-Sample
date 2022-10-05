@@ -1,6 +1,6 @@
 #pragma kernel CSMain
 
-// Utilities and useful
+// Function Storage
 
 float sdfCircle(float2 cam, float2 pos, float rad) {
     return distance(cam, pos) - rad;
@@ -14,6 +14,45 @@ float sdfBox(float2 cam, float2 pos, float2 size) {
     return (g > 0.0) ? l : g;
 }
 
+float4 Combine(float object1, float object2, float3 color1, float3 color2, int operation) {
+    float distance = 0;
+    float3 color = color1;
+    if (operation == 0) {
+        distance = min(object1, object2);
+        if (object2 < object1) color = color2;
+    } else if (operation == 1) {
+        distance = max(object1, -object2);
+        if (-object2 > object1) color = color2;
+    } else if (operation == 2) {
+        distance = max(object1, object2);
+        if (object2 > object1) color = color2;
+    }
+    return float4(color, distance);
+}
+
+float4 Scene(float2 cam) {
+    float distance = maxDst;
+    float3 globalColor = 1;
+    for (int i = 0; i < objectCount; i++) {
+        Object object = objects[i];
+        int children = object.children;
+        float tempDist = GetShapeDistance(object, cam);
+        float3 localColour = object.colour;
+        for (int j = 0; j < children; j++) {
+            Object objectChild = objects[i+j+1];
+            float childDist = GetShapeDistance(objectChild, cam);
+            float4 combined = Combine(tempDist, childDist, localColor, objectChild.color, objectChild.operation);
+            localColor = combined.xyz;
+            tempDist = combined.w;
+        }
+        i += children;
+        float4 combined = Combine(distance, tempDist, globalColor, localColor, shape.operation);
+        globalColor = combined.xyz;
+        distance = combined.w;        
+    }
+    return float4(globalColor, distance);
+}
+
 // Actual Code Below
 
 RWTexture2D<float4> MainTexture;
@@ -22,7 +61,11 @@ float res;
 
 struct Object {
     float2 position;
+    float2 scale;
+    float3 color;
     int type;
+    int operation;
+    int children;
 };
 
 struct Ray {
@@ -38,6 +81,5 @@ void CSMain (uint3 id : SV_DispatchThreadID) {
     uint width, height;
     MainTexture.GetDimensions(width, height);
     float2 uv = id.xy / float2(width, height) * 2 - 1;
-
     MainTexture[id.xy] = float4(uv.x, uv.y, 0.0, 0.0);
 }
