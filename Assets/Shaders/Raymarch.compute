@@ -42,8 +42,8 @@ float sdfBox(float2 cam, float2 pos, float2 scale) {
 }
 
 float sdfTorus(float2 cam, float2 pos, float2 scale) {
-    float2 q = float2(length(cam - pos) - t.x, p.y);
-    return length(q) - t.y;
+    float2 q = float2(length(cam - pos.yx) - scale.x, scale.y);
+    return length(q) - scale.y;
 }
 
 float4 Combine(float object1, float object2, float3 color1, float3 color2, int operation) {
