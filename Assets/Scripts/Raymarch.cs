@@ -5,17 +5,36 @@ using UnityEngine;
 [ExecuteInEditMode, ImageEffectAllowedInSceneView]
 public class Raymarch : MonoBehaviour
 {
-    public ComputeShader computeShader;
-    public RenderTexture renderTexture;
+    Camera camera;
+    [SerializeField]
+    ComputeShader computeShader;
+    RenderTexture renderTexture;
+    List<ComputeBuffer> disposables;
 
-    private void OnRenderImage(RenderTexture src, RenderTexture dest) {
-        renderTexture = new RenderTexture(256, 256, 24);
-        renderTexture.enableRandomWrite = true;
-        renderTexture.Create();
-        computeShader.SetTexture(0, "Result", renderTexture);
-        computeShader.SetFloat("res", renderTexture.width);
-        computeShader.Dispatch(0, renderTexture.width / 8, renderTexture.height / 8, 1);
-        Graphics.Blit(renderTexture, dest);
+    private void Init() {
+        camera = Camera.current;
+        disposables = new List<ComputeBuffer>();
+    }
+
+    private void InitTexture() {
+        if (renderTexture == null || renderTexture.width != camera.pixelWidth || renderTexture.height != camera.pixelHeight) {
+            if (renderTexture != null) {
+                renderTexture.Release();
+            }
+            renderTexture = new RenderTexture(camera.pixelWidth, camera.pixelHeight, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            renderTexture.enableRandomWrite = true;
+            renderTexture.Create();
+        }
+    }
+
+    private void OnRenderImage(RenderTexture source, RenderTexture destination) {
+        Init();
+        InitTexture();
+        computeShader.SetTexture(0, "MainTexture", renderTexture);
+        int tgx = Mathf.CeilToInt(camera.pixelWidth / 8.0f);
+        int tgy = Mathf.CeilToInt(camera.pixelHeight / 8.0f);
+        computeShader.Dispatch(0, tgx, tgy, 1);
+        Graphics.Blit(renderTexture, destination);
     }
 
     // Update is called once per frame

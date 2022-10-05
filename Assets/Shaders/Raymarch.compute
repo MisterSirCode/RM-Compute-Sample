@@ -1,15 +1,43 @@
 #pragma kernel CSMain
 
-RWTexture2D<float4> Result;
+// Utilities and useful
+
+float sdfCircle(float2 cam, float2 pos, float rad) {
+    return distance(cam, pos) - rad;
+}
+
+float sdfBox(float2 cam, float2 pos, float2 size) {
+    float2 w = abs(cam - pos) - size;
+    float g = max(w.x, w.y);
+    float2 q = max(w, 0.0);
+    float l = length(q);
+    return (g > 0.0) ? l : g;
+}
+
+// Actual Code Below
+
+RWTexture2D<float4> MainTexture;
 
 float res;
 
+struct Object {
+    float2 position;
+    int type;
+};
+
+struct Ray {
+    float2 origin;
+    float2 direction;
+};
+
+StructuredBuffer<Object> objects;
+int objectCount;
 
 [numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
-{
-    float x = id.x / res;
-    float y = id.y / res;
+void CSMain (uint3 id : SV_DispatchThreadID) {
+    uint width, height;
+    MainTexture.GetDimensions(width, height);
+    float2 uv = id.xy / float2(width, height) * 2 - 1;
 
-    Result[id.xy] = float4(x, y, 0.0, 0.0);
+    MainTexture[id.xy] = float4(uv.x, uv.y, 0.0, 0.0);
 }
