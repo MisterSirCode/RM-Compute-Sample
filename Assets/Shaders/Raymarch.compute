@@ -1,63 +1,14 @@
 #pragma kernel CSMain
 
-// Function Storage
-
-float sdfCircle(float2 cam, float2 pos, float rad) {
-    return distance(cam, pos) - rad;
-}
-
-float sdfBox(float2 cam, float2 pos, float2 size) {
-    float2 w = abs(cam - pos) - size;
-    float g = max(w.x, w.y);
-    float2 q = max(w, 0.0);
-    float l = length(q);
-    return (g > 0.0) ? l : g;
-}
-
-float4 Combine(float object1, float object2, float3 color1, float3 color2, int operation) {
-    float distance = 0;
-    float3 color = color1;
-    if (operation == 0) {
-        distance = min(object1, object2);
-        if (object2 < object1) color = color2;
-    } else if (operation == 1) {
-        distance = max(object1, -object2);
-        if (-object2 > object1) color = color2;
-    } else if (operation == 2) {
-        distance = max(object1, object2);
-        if (object2 > object1) color = color2;
-    }
-    return float4(color, distance);
-}
-
-float4 Scene(float2 cam) {
-    float distance = maxDst;
-    float3 globalColor = 1;
-    for (int i = 0; i < objectCount; i++) {
-        Object object = objects[i];
-        int children = object.children;
-        float tempDist = GetShapeDistance(object, cam);
-        float3 localColour = object.colour;
-        for (int j = 0; j < children; j++) {
-            Object objectChild = objects[i+j+1];
-            float childDist = GetShapeDistance(objectChild, cam);
-            float4 combined = Combine(tempDist, childDist, localColor, objectChild.color, objectChild.operation);
-            localColor = combined.xyz;
-            tempDist = combined.w;
-        }
-        i += children;
-        float4 combined = Combine(distance, tempDist, globalColor, localColor, shape.operation);
-        globalColor = combined.xyz;
-        distance = combined.w;        
-    }
-    return float4(globalColor, distance);
-}
-
-// Actual Code Below
+// Variables and Structs
 
 RWTexture2D<float4> MainTexture;
 
 float res;
+float max_range = 100;
+float2 cameraPos;
+float4x4 cameraToWorld;
+float cameraZoom;
 
 struct Object {
     float2 position;
@@ -76,10 +27,76 @@ struct Ray {
 StructuredBuffer<Object> objects;
 int objectCount;
 
+// Function Storage
+
+float sdfCircle(float2 cam, float2 pos, float rad) {
+    return distance(cam, pos) - rad;
+}
+
+float sdfBox(float2 cam, float2 pos, float2 scale) {
+    float2 w = abs(cam - pos) - scale;
+    float g = max(w.x, w.y);
+    float2 q = max(w, 0.0);
+    float l = length(q);
+    return (g > 0.0) ? l : g;
+}
+
+float4 Combine(float object1, float object2, float3 color1, float3 color2, int operation) {
+    float distance = object1;
+    float3 color = color1;
+    if (operation == 0) {
+        distance = min(object1, object2);
+        if (object2 < object1) color = color2;
+    } else if (operation == 1) {
+        distance = max(object1, -object2);
+        if (-object2 > object1) color = color2;
+    } else if (operation == 2) {
+        distance = max(object1, object2);
+        if (object2 > object1) color = color2;
+    }
+    return float4(color, distance);
+}
+
+float GetShapeDistance(Object object, float2 cam) {
+    if (object.type == 0)
+        return sdfBox(cam, object.position, object.scale);
+    else if (object.type == 1)
+        return sdfCircle(cam, object.position, object.scale.x);
+    return max_range;
+}
+
+float4 Scene(float2 cam) {
+    float distance = max_range;
+    float3 globalColor = 1;
+    for (int i = 0; i < objectCount; i++) {
+        Object object = objects[i];
+        int children = object.children;
+        float tempDist = GetShapeDistance(object, cam);
+        float3 localColor = object.color;
+        for (int j = 0; j < children; j++) {
+            Object objectChild = objects[i+j+1];
+            float childDist = GetShapeDistance(objectChild, cam);
+            float4 combined = Combine(tempDist, childDist, localColor, objectChild.color, objectChild.operation);
+            localColor = combined.xyz;
+            tempDist = combined.w;
+        }
+        i += children;
+        float4 combined = Combine(distance, tempDist, globalColor, localColor, object.operation);
+        globalColor = combined.xyz;
+        distance = combined.w;        
+    }
+    return float4(globalColor, distance);
+}
+
+// Actual Code Below
+
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID) {
     uint width, height;
     MainTexture.GetDimensions(width, height);
-    float2 uv = id.xy / float2(width, height) * 2 - 1;
-    MainTexture[id.xy] = float4(uv.x, uv.y, 0.0, 0.0);
+    //float2 uv = id.xy / float2(width, height) * 2 - 1;
+    float2 uv = ((2 * id.xy - float2(width, height)) / height * cameraZoom + cameraPos) * 2.0;
+    //uv = mul(cameraToWorld, float4(uv,0,1)).xy;
+    float4 info = Scene(uv);
+    MainTexture[id.xy] = float4(info.xyz, 1.0);
 }

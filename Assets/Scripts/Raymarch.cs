@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
 struct ObjectData {
     public Vector2 position;
@@ -74,6 +75,12 @@ public class Raymarch : MonoBehaviour
         sceneBuffer.SetData(data);
         computeShader.SetBuffer(0, "objects", sceneBuffer);
         computeShader.SetInt("objectCount", data.Length);
+        Vector3 cpos = camera.transform.position;
+        computeShader.SetFloats("cameraPos", new float[2] { cpos.x, cpos.y });
+        computeShader.SetMatrix("cameraToWorld", camera.cameraToWorldMatrix);
+        float scale = 1;
+        scale = camera.orthographicSize;
+        computeShader.SetFloat("cameraZoom", scale);
         disposables.Add(sceneBuffer);
     }
 
